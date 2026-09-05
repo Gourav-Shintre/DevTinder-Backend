@@ -18,7 +18,7 @@ router.post('/send/:status/:toUserId',authCheck,async(req,res)=>{
             return res.status(400).send({message : 'user can not send request to himself'})
         }
 
-
+        const touserData =await User.findById(toUserId)
 
         //check user is present i db or not 
 
@@ -43,10 +43,6 @@ router.post('/send/:status/:toUserId',authCheck,async(req,res)=>{
             ]
         })
 
-
-
-
-
         if(existingconnectionReq){
             return res.status(400).send({message : 'connection request already exists'})
         }
@@ -56,9 +52,11 @@ router.post('/send/:status/:toUserId',authCheck,async(req,res)=>{
             toUserId,
             status
         })
+        const msg = status === 'interested' 
+            ? `${req.user.firstName} is ${status} in ${touserData.firstName} profile` 
+            : `${req.user.firstName} is ${status}  ${touserData.firstName} profile`;
 
-        res.send({message : 'connection request send succesfully', data})
-
+res.send({ message: msg, data })
     }catch(e){
         console.error('POST /request/send failed:', e)
         res.status(500).send({message : 'something went wrong', error : e.message})

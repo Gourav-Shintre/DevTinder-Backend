@@ -1,13 +1,11 @@
 import mongoose from "mongoose";
-import { _enum } from "zod/v4/core";
-
 const connectionRequest = new mongoose.Schema({
     fromUserId : {
-        require : true,
+        required : true,
         type : mongoose.Schema.Types.ObjectId
     },
     toUserId : {
-        require : true,
+        required : true,
         type : mongoose.Schema.Types.ObjectId
     },
     status : {
@@ -15,5 +13,10 @@ const connectionRequest = new mongoose.Schema({
         enum : ['interested' , 'rejected' , 'accepted', 'ignored'],
         message : '{value} is incorrect status type'
     }
+})
+
+connectionRequest.index({
+    fromUserId : 1,
+    toUserId : 1
 })
 export const connectRequestModal =new mongoose.model('connectionRequest',connectionRequest)
