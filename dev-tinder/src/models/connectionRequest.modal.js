@@ -1,10 +1,13 @@
 import mongoose from "mongoose";
+// import { User } from "./usser.model";
 const connectionRequest = new mongoose.Schema({
     fromUserId : {
         required : true,
+        ref : 'User',
         type : mongoose.Schema.Types.ObjectId
     },
     toUserId : {
+        ref : "User",
         required : true,
         type : mongoose.Schema.Types.ObjectId
     },
