@@ -4,8 +4,13 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
 import { signupSchema } from '../utlis/signupVaidation.js';
 import { User } from '../models/usser.model.js';
-import { authCheck } from '../middleware/auth.middleware.js';
 const router = express.Router();
+
+// strip the password hash before sending a user to the client
+const toSafeUser = (user) => {
+    const { password, ...safeUser } = user.toObject();
+    return safeUser;
+}
 
 //register
 router.post('/signup', validateData(signupSchema),async(req,res)=>{
@@ -19,10 +24,10 @@ router.post('/signup', validateData(signupSchema),async(req,res)=>{
 
 try{
     await user.save()
-    res.send('user Registered successfully',user)
+    return res.status(201).json({message : 'user Registered successfully', data : toSafeUser(user)})
 
 }catch(e){
-    res.status(400).send({message : e.message})
+    return res.status(400).send({message : e.message})
 }
 })
 
@@ -36,28 +41,26 @@ router.post('/login',async(req, res)=>{
     const user = await User.findOne({emailId : emailId});
 
     if(!user){
-        res.status(404).send('user not found')
+        return res.status(404).send({message : 'user not found'})
     }
     const isCorrect = await bcrypt.compare(password ,user.password )
 
     if(!isCorrect){
-        res.status(400).send({message :"incorrect Password"})
+        return res.status(400).send({message :"incorrect Password"})
     }
     let accessToken = jwt.sign({id : user._id},'gourav',{ expiresIn: '1d' })
-    console.log(accessToken)
     res.cookie('accessToken',accessToken)
 
-    res.send({message : "USer logged in successfully"})
+    return res.send({message : "User logged in successfully", data : toSafeUser(user)})
 
-    let decode = jwt.verify(accessToken,'gourav')
-    console.log(decode,"decode")
-        
     } catch (error) {
-        res.send({message : error.message})
+        return res.status(500).send({message : error.message})
     }
 })
 
-router.post('/logout',authCheck,async(req,res)=>{
+// logout only clears the cookie, so it does not need authCheck —
+// this lets a user with an expired token still log out cleanly
+router.post('/logout',async(req,res)=>{
     try{
         res.clearCookie('accessToken')
         res.status(200).send({message: "User Logged Out Successfully"})

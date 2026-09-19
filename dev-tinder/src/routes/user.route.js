@@ -1,14 +1,14 @@
 import express from "express";
 import { authCheck } from "../middleware/auth.middleware.js";
-import { User } from "../models/usser.model.js";
+import { User, USER_SAFE_FIELDS } from "../models/usser.model.js";
 import { connectRequestModal } from "../models/connectionRequest.modal.js";
 const router = express.Router();
 
-router.get("/feed", authCheck, async (req, res) => {
-  const data = await User.find();
-  console.log(data, "data");
-  res.send({ message: "data fetched successfully", data });
-});
+// router.get("/feed", authCheck, async (req, res) => {
+//   const data = await User.find();
+//   console.log(data, "data");
+//   res.send({ message: "data fetched successfully", data });
+// });
 
 router.get("/getbyEmailId", authCheck, async (req, res) => {
   try {
@@ -86,14 +86,39 @@ router.get("/", authCheck, async (req, res) => {
   try {
     const id = req.user.id;
 
-    const userData = await User.findById(id);
+    const userData = await User.findById(id).select(USER_SAFE_FIELDS);
 
     if (!userData) {
-      res.status(404).send("user not found");
+      return res.status(404).send({ message: "user not found" });
     }
-    res.send({ message: "user data fetched successfully", data: userData });
+    return res.send({ message: "user data fetched successfully", data: userData });
   } catch (e) {
-    res.status(400).send({ message: e.message });
+    return res.status(400).send({ message: e.message });
+  }
+});
+
+// update the logged-in user's own profile
+const PROFILE_EDITABLE_FIELDS = ["firstName", "lastName", "age", "gender", "skills", "photoUrl"];
+
+router.patch("/profile", authCheck, async (req, res) => {
+  try {
+    const invalidFields = Object.keys(req.body).filter(
+      (key) => !PROFILE_EDITABLE_FIELDS.includes(key)
+    );
+    if (invalidFields.length > 0) {
+      return res
+        .status(400)
+        .send({ message: `these fields can not be updated: ${invalidFields.join(", ")}` });
+    }
+
+    const data = await User.findByIdAndUpdate(req.user.id, req.body, {
+      returnDocument: "after",
+      runValidators: true,
+    }).select(USER_SAFE_FIELDS);
+
+    return res.send({ message: "profile updated successfully", data });
+  } catch (e) {
+    return res.status(400).send({ message: e.message });
   }
 });
 
@@ -106,7 +131,7 @@ router.get("/getAllRequests", authCheck, async (req, res) => {
         toUserId: userId,
         status: "interested",
       })
-      .populate("fromUserId", ["firstName", "lastName"]);
+      .populate("fromUserId", USER_SAFE_FIELDS);
 
     return res
       .status(200)
@@ -116,8 +141,6 @@ router.get("/getAllRequests", authCheck, async (req, res) => {
   }
 });
 
-
-const userSafeData = ['firstName' , 'lastName' ,'skills','gender']
 //get all connections
 router.get("/connections", authCheck, async (req, res) => {
   try {
@@ -133,11 +156,62 @@ router.get("/connections", authCheck, async (req, res) => {
           },
         ],
       })
-      .populate("fromUserId toUserId", userSafeData);
+      .populate("fromUserId toUserId", USER_SAFE_FIELDS);
 
     res.status(200).send({ message: "data fetched successfully", data });
   } catch (e) {
     res.status(400).send({ error: e.message });
+  }
+});
+
+//get all users (feed)
+
+router.get("/feed", authCheck, async (req, res) => {
+  try {
+    //show feed that are not freinds or snet frend request or ignore the connection request
+
+    const loggedInUserId = req.user.id;
+
+    const connectionRequets = await connectRequestModal
+      .find({
+        $or: [
+          {
+            fromUserId: loggedInUserId,
+          },
+          {
+            toUserId: loggedInUserId,
+          },
+        ],
+      })
+      .select("fromUserId toUserId");
+
+    console.log(connectionRequets, "connectionRequets");
+    // return res.send(connectionRequets)
+
+    const hideFromFeed = new Set();
+
+    connectionRequets.forEach((req) => {
+      hideFromFeed.add(req.fromUserId.toString());
+      hideFromFeed.add(req.toUserId.toString());
+    });
+    console.log(hideFromFeed, "hideFromFeed");
+
+    const data = await User.find({
+      $and: [
+        {
+          _id: {
+            $nin: [...hideFromFeed],
+          },
+        },
+        {
+          _id: { $ne: loggedInUserId },
+        },
+      ],
+    }).select(USER_SAFE_FIELDS);
+
+    res.status(200).send({ message: "data fetched suucessfully", data });
+  } catch (e) {
+    return res.status(400).send({ error: e.message });
   }
 });
 

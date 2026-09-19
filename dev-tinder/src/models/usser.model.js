@@ -57,3 +57,6 @@ const userSchema = new  Schema({
     timestamps : true
 })
 export const User = mongoose.model('User',userSchema);
+
+// Fields that are safe to send to the client (never include password)
+export const USER_SAFE_FIELDS = "firstName lastName emailId age gender skills photoUrl";
